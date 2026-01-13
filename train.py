@@ -1,7 +1,8 @@
 import numpy as np
 from scipy.io import loadmat
 from sklearn.model_selection import train_test_split
-from model import NeuralNetwork
+from sklearn.metrics import accuracy_score
+from model import create_model
 
 # -------- LOAD DATA --------
 data1 = loadmat("data/ex3data1.mat")
@@ -18,61 +19,20 @@ y2[y2 == 10] = 0
 X = np.vstack((X1, X2)) / 255.0
 y = np.hstack((y1, y2))
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
 
-# -------- MODEL --------
-model = NeuralNetwork()
-lr = 0.1
-epochs = 50
+# -------- TRAIN MODEL --------
+model = create_model()
+model.fit(X_train, y_train)
 
-# -------- TRAINING --------
-for epoch in range(epochs):
-
-    # Forward
-    z1 = X_train @ model.W1 + model.b1
-    a1 = np.maximum(0, z1)
-    z2 = a1 @ model.W2 + model.b2
-
-    exp = np.exp(z2 - np.max(z2, axis=1, keepdims=True))
-    probs = exp / np.sum(exp, axis=1, keepdims=True)
-
-    # Backprop
-    probs[np.arange(len(y_train)), y_train] -= 1
-    probs /= len(y_train)
-
-    dW2 = a1.T @ probs
-    db2 = np.sum(probs, axis=0, keepdims=True)
-
-    da1 = probs @ model.W2.T
-    dz1 = da1 * (z1 > 0)
-
-    dW1 = X_train.T @ dz1
-    db1 = np.sum(dz1, axis=0, keepdims=True)
-
-    # Update
-    model.W2 -= lr * dW2
-    model.b2 -= lr * db2
-    model.W1 -= lr * dW1
-    model.b1 -= lr * db1
-
-    if epoch % 10 == 0:
-        print(f"Epoch {epoch}")
-
-# -------- TEST --------
-z1 = X_test @ model.W1 + model.b1
-a1 = np.maximum(0, z1)
-z2 = a1 @ model.W2 + model.b2
-
-preds = np.argmax(z2, axis=1)
-accuracy = np.mean(preds == y_test)
+# -------- EVALUATE --------
+y_pred = model.predict(X_test)
+accuracy = accuracy_score(y_test, y_pred)
 
 print("Accuracy:", accuracy)
 
-# -------- SAVE --------
-np.savez(
-    "model_weights.npz",
-    W1=model.W1,
-    b1=model.b1,
-    W2=model.W2,
-    b2=model.b2
-)
+# -------- SAVE MODEL --------
+import joblib
+joblib.dump(model, "model_weights.pkl")
